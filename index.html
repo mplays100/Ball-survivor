@@ -46,7 +46,7 @@ window.admob = {
 };
 </script>
 <!-- PayPal SDK -->
-<script src="https://www.paypal.com/sdk/js?client-id=AWLLZuzTP2tX72NcpXd6aqQOl24UyK2_bfkBIMhAWQMYVp28fVSe-FOWXRc8yRQoNeondtjavW9Pqynz&currency=USD"></script>
+<script src="https://www.paypal.com/sdk/js?client-id=ARN5t8iD1EHRMzaLkDGvsPvLkCqrBU4ySF-SeVbbweLngghtrFOXnboVms0Kjt9YqzF5sTj7DqGXGRJQ&currency=USD"></script>
 <!-- Stripe SDK -->
 <script src="https://js.stripe.com/v3/"></script>
 <style>
@@ -624,7 +624,7 @@ async function initializeMonetization() {
     }
     
     if (window.paypal) {
-      await paymentManager.initializePayPal('AWLLZuzTP2tX72NcpXd6aqQOl24UyK2_bfkBIMhAWQMYVp28fVSe-FOWXRc8yRQoNeondtjavW9Pqynz');
+      await paymentManager.initializePayPal('ARN5t8iD1EHRMzaLkDGvsPvLkCqrBU4ySF-SeVbbweLngghtrFOXnboVms0Kjt9YqzF5sTj7DqGXGRJQ');
       console.log('Payment Manager initialized successfully');
     } else {
       console.error('PayPal SDK failed to load after', maxAttempts, 'attempts');
@@ -2137,7 +2137,7 @@ function usePayPal(amount, price) {
   // Create PayPal payment with your client ID
   const paypalUrl = `https://www.paypal.com/cgi-bin/webscr?` +
     `cmd=_xclick&` +
-    `business=AWLLZuzTP2tX72NcpXd6aqQOl24UyK2_bfkBIMhAWQMYVp28fVSe-FOWXRc8yRQoNeondtjavW9Pqynz&` + // Your PayPal client ID
+    `business=ARN5t8iD1EHRMzaLkDGvsPvLkCqrBU4ySF-SeVbbweLngghtrFOXnboVms0Kjt9YqzF5sTj7DqGXGRJQ&` + // Your PayPal client ID
     `item_name=${amount} Gems Pack&` +
     `amount=${price}&` +
     `currency_code=USD&` +
