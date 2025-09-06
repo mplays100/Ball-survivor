@@ -1,0 +1,2380 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no" />
+<title>Cursor AI — Mobile Controls & Gameplay</title>
+<!-- Payment Request API for Google Pay/Apple Pay -->
+<!-- AdMob SDK -->
+<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-5195536033612408"></script>
+<!-- AdMob Web SDK -->
+<script async src="https://www.gstatic.com/admob/rewarded_v2/rewarded_v2.js"></script>
+<script>
+// AdMob Web SDK initialization
+window.admob = {
+  start: async (config) => {
+    console.log('AdMob start called with config:', config);
+    return Promise.resolve();
+  },
+  prepareRewardVideoAd: async (config) => {
+    console.log('Preparing rewarded ad with config:', config);
+    return {
+      addEventListener: (event, callback) => {
+        console.log('Ad event listener added:', event);
+        if (event === 'rewarded') {
+          setTimeout(() => callback(), 1000);
+        }
+        if (event === 'closed') {
+          setTimeout(() => callback(), 3000);
+        }
+      },
+      show: async () => {
+        console.log('Showing rewarded ad');
+        return Promise.resolve();
+      }
+    };
+  },
+  prepareInterstitial: async (config) => {
+    console.log('Preparing interstitial ad with config:', config);
+    return {
+      show: async () => {
+        console.log('Showing interstitial ad');
+        return Promise.resolve();
+      }
+    };
+  }
+};
+</script>
+<!-- PayPal SDK -->
+<script src="https://www.paypal.com/sdk/js?client-id=AWLLZuzTP2tX72NcpXd6aqQOl24UyK2_bfkBIMhAWQMYVp28fVSe-FOWXRc8yRQoNeondtjavW9Pqynz&currency=USD"></script>
+<!-- Stripe SDK -->
+<script src="https://js.stripe.com/v3/"></script>
+<style>
+  :root{
+    --bg1:#1b2b64; --bg2:#0f1724;
+    --panel: rgba(20,20,22,0.86);
+    --accent: #00e0b8;
+    --danger: #ff6b6b;
+    --muted: #9aa;
+  }
+  html,body{height:100%;margin:0;font-family:Inter,Arial,Helvetica,sans-serif;background:linear-gradient(180deg,var(--bg1),var(--bg2)); color:#fff; -webkit-tap-highlight-color: transparent;}
+  canvas{display:block;width:100vw;height:100vh; background:transparent;}
+  #ui{position:absolute;left:12px;top:12px;z-index:40}
+  .hud{background:var(--panel);padding:8px 12px;border-radius:10px;margin-bottom:8px;font-size:14px;box-shadow:0 10px 30px rgba(0,0,0,0.6)}
+  #hint{font-size:12px;color:var(--muted)}
+  /* Store */
+  #store{position:absolute;right:12px;top:12px;width:300px;background:var(--panel);padding:12px;border-radius:10px;display:none;z-index:41}
+  .store-btn{display:block;width:100%;padding:8px;margin:6px 0;border-radius:8px;border:none;background:#222;color:#fff;cursor:pointer}
+  /* Game over / restart */
+  #gameOver{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);background:rgba(0,0,0,0.85);padding:18px;border-radius:12px;display:none;z-index:50;text-align:center}
+  button.primary{background:var(--accent);border:none;padding:8px 12px;border-radius:8px;cursor:pointer}
+  button.ghost{background:transparent;border:1px solid rgba(255,255,255,0.06);padding:8px 12px;border-radius:8px;cursor:pointer;margin-left:8px}
+  /* Joystick */
+  #joystick {
+    position: absolute;
+    left: 18px;
+    bottom: 18px;
+    width: 140px;
+    height: 140px;
+    border-radius: 50%;
+    display: none;
+    z-index: 45;
+    touch-action: none;
+  }
+  #joy-base {
+    position:absolute; width:100%; height:100%; border-radius:50%; background:rgba(255,255,255,0.03); border: 2px solid rgba(255,255,255,0.05);
+    display:flex; align-items:center; justify-content:center;
+  }
+  #joy-stick {
+    position:absolute; width:56px;height:56px;border-radius:50%; background:linear-gradient(180deg,#a6ffd9,#7ee7d9); box-shadow:0 8px 20px rgba(0,0,0,0.45);
+    left:50%; top:50%; transform:translate(-50%,-50%);
+    touch-action:none;
+  }
+  @media (max-width:520px){
+    #store{width:86%;right:7%;left:7%;top:10%}
+    #joystick{width:120px;height:120px}
+    #joy-stick{width:48px;height:48px}
+  }
+  
+  /* Mobile control buttons */
+  .mobile-btn {
+  padding: 16px 12px;
+    border: none;
+  border-radius: 12px;
+    color: white;
+    font-weight: bold;
+  font-size: 14px;
+    cursor: pointer;
+  box-shadow: 0 6px 12px rgba(0,0,0,0.4);
+    transition: all 0.2s ease;
+    touch-action: manipulation;
+    user-select: none;
+    -webkit-tap-highlight-color: transparent;
+  min-height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  line-height: 1.2;
+  }
+  
+  .mobile-btn:active {
+  transform: scale(0.92);
+  box-shadow: 0 3px 6px rgba(0,0,0,0.4);
+  }
+  
+  .mobile-btn:disabled {
+    opacity: 0.5;
+    transform: none;
+  }
+
+/* Mobile controls container */
+#mobileControls {
+  position: absolute;
+  right: 16px;
+  bottom: 16px;
+  z-index: 45;
+  display: none;
+  background: rgba(0,0,0,0.3);
+  padding: 12px;
+  border-radius: 16px;
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255,255,255,0.1);
+}
+
+/* Mobile control rows */
+.mobile-control-row {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.mobile-control-row:last-child {
+  margin-bottom: 0;
+}
+
+/* Individual button styles */
+.store-btn { background: linear-gradient(45deg, #4CAF50, #45a049) !important; }
+.pause-btn { background: linear-gradient(45deg, #2196F3, #1976D2) !important; }
+.settings-btn { background: linear-gradient(45deg, #9C27B0, #7B1FA2) !important; }
+.upgrade-btn { background: linear-gradient(45deg, #FF9800, #F57C00) !important; }
+.challenge-btn { background: linear-gradient(45deg, #E91E63, #C2185B) !important; }
+.special-btn { background: linear-gradient(45deg, #FF5722, #D84315) !important; }
+.premium-btn { 
+  background: linear-gradient(45deg, #ffd700, #ffb300) !important; 
+  color: #000 !important;
+  grid-column: 1 / -1;
+}
+
+/* Close button styles */
+.close-btn {
+  transition: all 0.2s ease;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.close-btn:hover {
+  background: rgba(255,255,255,0.2) !important;
+  transform: scale(1.1);
+}
+
+.close-btn:active {
+  transform: scale(0.9);
+}
+
+/* Responsive mobile controls */
+@media (max-width: 480px) {
+  #mobileControls {
+    right: 8px;
+    bottom: 8px;
+    padding: 8px;
+  }
+  
+  .mobile-btn {
+    padding: 14px 10px;
+    font-size: 13px;
+    min-height: 44px;
+  }
+  
+  .mobile-control-row {
+    gap: 6px;
+    margin-bottom: 6px;
+  }
+}
+  
+  /* Show mobile controls on touch devices */
+  @media (hover: none) and (pointer: coarse) {
+    #mobileControls {
+      display: block !important;
+    }
+  }
+  
+  /* Hide mobile controls on desktop */
+  @media (hover: hover) and (pointer: fine) {
+    #mobileControls {
+      display: none !important;
+    }
+  }
+</style>
+</head>
+<body>
+<canvas id="game"></canvas>
+
+<div id="ui">
+  <div class="hud" id="scoreHud">Score: 100 &nbsp;|&nbsp; Coins: 0 &nbsp;|&nbsp; Lives: 3</div>
+  <div class="hud" id="powerHud">Shield: OFF &nbsp;|&nbsp; Double: OFF &nbsp;|&nbsp; Slow: OFF</div>
+  <div id="hint">Move mouse / drag finger. Touch left side to show joystick. Press <strong>S</strong> for store, <strong>P</strong> to pause, <strong>ESC</strong> for settings, <strong>V</strong> for upgrades, <strong>C</strong> for challenges, <strong>G</strong> for premium shop, <strong>SPACE</strong> for special attack. <span id="mobileHint" style="display:none">📱 Use bottom-right buttons for mobile controls!</span></div>
+</div>
+
+<!-- Mobile Controls -->
+<div id="mobileControls">
+  <div class="mobile-control-row">
+    <button class="mobile-btn store-btn" onclick="toggleStore()">🏪 Store</button>
+    <button class="mobile-btn pause-btn" onclick="togglePause()">⏸️ Pause</button>
+  </div>
+  <div class="mobile-control-row">
+    <button class="mobile-btn settings-btn" onclick="toggleSettings()">⚙️ Settings</button>
+    <button class="mobile-btn upgrade-btn" onclick="toggleUpgradeShop()">🎨 Upgrades</button>
+  </div>
+  <div class="mobile-control-row">
+    <button class="mobile-btn challenge-btn" onclick="toggleDailyChallenges()">🎯 Challenges</button>
+    <button class="mobile-btn special-btn" onclick="useSpecialAttack()" id="specialAttackBtn">⚡ Special</button>
+  </div>
+  <div class="mobile-control-row">
+    <button class="mobile-btn premium-btn" onclick="togglePremiumShop()">💎 Premium</button>
+  </div>
+</div>
+
+<div id="store">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+    <h3 style="margin:0">Store</h3>
+    <button class="close-btn" onclick="toggleStore()" style="background:none;border:none;color:#fff;font-size:20px;cursor:pointer;padding:0;width:30px;height:30px;display:flex;align-items:center;justify-content:center;border-radius:50%;background:rgba(255,255,255,0.1)">×</button>
+  </div>
+  <div id="coinsDisplay" style="font-size:13px;color:var(--muted);margin-bottom:8px">Coins: 0</div>
+  <button class="store-btn" onclick="buy('shield')">Shield (40)</button>
+  <button class="store-btn" onclick="buy('double')">Double Points (60)</button>
+  <button class="store-btn" onclick="buy('slow')">Slow Enemies (50)</button>
+  <button class="store-btn" onclick="buy('heal')">Heal +40 (45)</button>
+  <button class="store-btn" onclick="buy('life')">Extra Life (120)</button>
+</div>
+
+<div id="gameOver">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+    <h2 style="margin:0;flex:1;text-align:center">Game Over</h2>
+    <button class="close-btn" onclick="restart()" style="background:none;border:none;color:#fff;font-size:20px;cursor:pointer;padding:0;width:30px;height:30px;display:flex;align-items:center;justify-content:center;border-radius:50%;background:rgba(255,255,255,0.1);margin-left:10px">×</button>
+  </div>
+  <div id="finalScore" style="margin:8px 0">Final Score: 0</div>
+  <div style="margin-bottom:12px" id="bestScore">Best: 0</div>
+  <div style="font-size:12px;color:var(--muted);margin-bottom:12px" id="gameStats">
+    Level: 1 • Games Played: 0 • Total Coins: 0
+  </div>
+  <div><button class="primary" onclick="restart()">Restart</button> <button class="ghost" onclick="downloadScore()">Download</button></div>
+</div>
+
+<div id="pauseOverlay" style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);background:rgba(0,0,0,0.85);padding:18px;border-radius:12px;display:none;z-index:50;text-align:center">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+    <h2 style="margin:0;flex:1;text-align:center">Paused</h2>
+    <button class="close-btn" onclick="togglePause()" style="background:none;border:none;color:#fff;font-size:20px;cursor:pointer;padding:0;width:30px;height:30px;display:flex;align-items:center;justify-content:center;border-radius:50%;background:rgba(255,255,255,0.1);margin-left:10px">×</button>
+  </div>
+  <div style="margin-bottom:12px">Press P or tap to resume</div>
+  <div><button class="primary" onclick="togglePause()">Resume</button> <button class="ghost" onclick="restart()">Restart</button></div>
+</div>
+
+<div id="settingsMenu" style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);background:rgba(0,0,0,0.9);padding:20px;border-radius:12px;display:none;z-index:51;text-align:left;min-width:280px">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:15px">
+    <h3 style="margin:0;text-align:center;flex:1">Settings</h3>
+    <button class="close-btn" onclick="closeSettings()" style="background:none;border:none;color:#fff;font-size:20px;cursor:pointer;padding:0;width:30px;height:30px;display:flex;align-items:center;justify-content:center;border-radius:50%;background:rgba(255,255,255,0.1);margin-left:10px">×</button>
+  </div>
+  
+  <div style="margin-bottom:12px">
+    <label style="display:flex;justify-content:space-between;align-items:center">
+      <span>Music</span>
+      <input type="checkbox" id="musicToggle" style="transform:scale(1.2)">
+    </label>
+  </div>
+  
+  <div style="margin-bottom:12px">
+    <label style="display:flex;justify-content:space-between;align-items:center">
+      <span>Sound Effects</span>
+      <input type="checkbox" id="sfxToggle" style="transform:scale(1.2)">
+    </label>
+  </div>
+  
+  <div style="margin-bottom:12px">
+    <label style="display:flex;justify-content:space-between;align-items:center">
+      <span>Haptic Feedback</span>
+      <input type="checkbox" id="hapticToggle" style="transform:scale(1.2)">
+    </label>
+  </div>
+  
+  <div style="margin-bottom:15px">
+    <label style="display:block;margin-bottom:5px">Difficulty</label>
+    <select id="difficultySelect" style="width:100%;padding:5px;background:#333;color:#fff;border:1px solid #555;border-radius:4px">
+      <option value="easy">Easy</option>
+      <option value="normal">Normal</option>
+      <option value="hard">Hard</option>
+    </select>
+  </div>
+  
+  <div style="text-align:center">
+    <button class="primary" onclick="closeSettings()">Close</button>
+  </div>
+</div>
+
+<div id="upgradeShop" style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);background:rgba(0,0,0,0.9);padding:20px;border-radius:12px;display:none;z-index:51;text-align:left;min-width:320px;max-height:80vh;overflow-y:auto">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:15px">
+    <h3 style="margin:0;text-align:center;flex:1">Visual Upgrades</h3>
+    <button class="close-btn" onclick="closeUpgradeShop()" style="background:none;border:none;color:#fff;font-size:20px;cursor:pointer;padding:0;width:30px;height:30px;display:flex;align-items:center;justify-content:center;border-radius:50%;background:rgba(255,255,255,0.1);margin-left:10px">×</button>
+  </div>
+  
+  <div style="margin-bottom:15px">
+    <h4 style="margin:0 0 8px 0">Player Skins</h4>
+    <div id="skinOptions" style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px">
+      <button class="store-btn" onclick="selectSkin('default')">Classic</button>
+      <button class="store-btn" onclick="selectSkin('neon')">Neon</button>
+      <button class="store-btn" onclick="selectSkin('fire')">Fire</button>
+      <button class="store-btn" onclick="selectSkin('ice')">Ice</button>
+    </div>
+  </div>
+  
+  <div style="margin-bottom:15px">
+    <h4 style="margin:0 0 8px 0">Particle Effects</h4>
+    <div id="particleOptions" style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px">
+      <button class="store-btn" onclick="selectParticles('default')">Classic</button>
+      <button class="store-btn" onclick="selectParticles('sparkle')">Sparkle</button>
+      <button class="store-btn" onclick="selectParticles('smoke')">Smoke</button>
+      <button class="store-btn" onclick="selectParticles('rainbow')">Rainbow</button>
+    </div>
+  </div>
+  
+  <div style="text-align:center">
+    <button class="primary" onclick="closeUpgradeShop()">Close</button>
+  </div>
+</div>
+
+<div id="dailyChallengesMenu" style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);background:rgba(0,0,0,0.9);padding:20px;border-radius:12px;display:none;z-index:51;text-align:left;min-width:300px">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:15px">
+    <h3 style="margin:0;text-align:center;flex:1">Daily Challenges</h3>
+    <button class="close-btn" onclick="closeDailyChallenges()" style="background:none;border:none;color:#fff;font-size:20px;cursor:pointer;padding:0;width:30px;height:30px;display:flex;align-items:center;justify-content:center;border-radius:50%;background:rgba(255,255,255,0.1);margin-left:10px">×</button>
+  </div>
+  <div style="font-size:12px;color:var(--muted);margin-bottom:15px;text-align:center">
+    Streak: <span id="streakDisplay">0</span> days
+  </div>
+  
+  <div id="challengesList" style="margin-bottom:15px">
+    <!-- Challenges will be populated here -->
+  </div>
+  
+  <div style="text-align:center">
+    <button class="primary" onclick="closeDailyChallenges()">Close</button>
+  </div>
+</div>
+
+<div id="premiumShop" style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);background:rgba(0,0,0,0.95);padding:20px;border-radius:12px;display:none;z-index:52;text-align:left;min-width:320px;max-height:80vh;overflow-y:auto">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:15px">
+    <h3 style="margin:0;text-align:center;color:#ffd700;flex:1">💎 Premium Shop</h3>
+    <button class="close-btn" onclick="closePremiumShop()" style="background:none;border:none;color:#fff;font-size:20px;cursor:pointer;padding:0;width:30px;height:30px;display:flex;align-items:center;justify-content:center;border-radius:50%;background:rgba(255,255,255,0.1);margin-left:10px">×</button>
+  </div>
+  
+  <div style="margin-bottom:15px;text-align:center">
+    <div style="font-size:14px;color:#ffd700;margin-bottom:5px">Your Gems: <span id="gemDisplay">0</span> 💎</div>
+    <button class="store-btn" onclick="watchAdForGems()" id="watchAdBtn" style="background:linear-gradient(45deg,#4CAF50,#45a049);color:white;margin-bottom:8px">Watch Ad for 5 Gems</button>
+  </div>
+  
+  <div style="margin-bottom:15px">
+    <h4 style="margin:0 0 8px 0;color:#ffd700">Premium Features</h4>
+    <div style="display:grid;gap:8px">
+      <button class="store-btn" onclick="buyPremiumFeature('noAds')" style="background:linear-gradient(45deg,#9C27B0,#7B1FA2);color:white">
+        🚫 No Ads (50 Gems)
+      </button>
+      <button class="store-btn" onclick="buyPremiumFeature('doubleCoins')" style="background:linear-gradient(45deg,#FF9800,#F57C00);color:white">
+        💰 Double Coins (75 Gems)
+      </button>
+      <button class="store-btn" onclick="buyPremiumFeature('extraLives')" style="background:linear-gradient(45deg,#E91E63,#C2185B);color:white">
+        ❤️ Extra Lives (60 Gems)
+      </button>
+      <button class="store-btn" onclick="buyPremiumFeature('customSkins')" style="background:linear-gradient(45deg,#00BCD4,#0097A7);color:white">
+        🎨 Custom Skins (40 Gems)
+      </button>
+      <button class="store-btn" onclick="buyPremiumFeature('unlimitedSpecial')" style="background:linear-gradient(45deg,#FF5722,#D84315);color:white">
+        ⚡ Unlimited Special Attack (100 Gems)
+      </button>
+    </div>
+  </div>
+  
+  <div style="margin-bottom:15px">
+    <h4 style="margin:0 0 8px 0;color:#ffd700">Gem Packs</h4>
+    <div style="display:grid;gap:8px">
+      <button class="store-btn" onclick="buyGemPack(50)" style="background:linear-gradient(45deg,#4CAF50,#45a049);color:white">
+        💎 50 Gems - $0.99
+      </button>
+      <button class="store-btn" onclick="buyGemPack(150)" style="background:linear-gradient(45deg,#2196F3,#1976D2);color:white">
+        💎 150 Gems - $2.99
+      </button>
+      <button class="store-btn" onclick="buyGemPack(500)" style="background:linear-gradient(45deg,#9C27B0,#7B1FA2);color:white">
+        💎 500 Gems - $7.99
+      </button>
+    </div>
+  </div>
+  
+  <div style="margin-bottom:15px">
+    <h4 style="margin:0 0 8px 0;color:#ffd700">Secure Payment</h4>
+    <div id="paypal-button-container" style="margin-bottom:10px"></div>
+    <div id="fallback-payment" style="display:none;margin-bottom:10px">
+      <button class="store-btn" onclick="useFallbackPayment()" style="background:linear-gradient(45deg,#0070ba,#005ea6);color:white;width:100%">
+        💳 Pay with Credit Card (Demo)
+      </button>
+      <div style="font-size:12px;color:var(--muted);text-align:center;margin-top:5px">
+        PayPal temporarily unavailable - using secure fallback
+      </div>
+    </div>
+    <div style="font-size:12px;color:var(--muted);text-align:center">
+      Powered by PayPal - Secure & Fast
+    </div>
+  </div>
+  
+  <div style="text-align:center">
+    <button class="primary" onclick="closePremiumShop()">Close</button>
+  </div>
+</div>
+
+<div id="adOverlay" style="position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.9);z-index:100;display:none;justify-content:center;align-items:center">
+  <div style="background:rgba(0,0,0,0.95);padding:30px;border-radius:12px;text-align:center;max-width:400px">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:15px">
+      <h3 style="margin:0;color:#ffd700;flex:1;text-align:center">📺 Ad Reward</h3>
+      <button class="close-btn" onclick="closeAd()" style="background:none;border:none;color:#fff;font-size:20px;cursor:pointer;padding:0;width:30px;height:30px;display:flex;align-items:center;justify-content:center;border-radius:50%;background:rgba(255,255,255,0.1);margin-left:10px">×</button>
+    </div>
+    <div style="margin-bottom:20px;font-size:16px">
+      Watch this ad to earn <strong>5 Gems</strong>!
+    </div>
+    <div style="margin-bottom:20px;padding:20px;background:rgba(255,255,255,0.1);border-radius:8px">
+      <div style="font-size:14px;color:var(--muted)">[Ad would play here]</div>
+      <div style="margin-top:10px;font-size:12px;color:var(--muted)">Simulated ad - 5 seconds</div>
+    </div>
+    <div style="display:flex;gap:10px;justify-content:center">
+      <button class="primary" onclick="simulateAdComplete()">Watch Ad</button>
+      <button class="ghost" onclick="closeAd()">Skip</button>
+    </div>
+  </div>
+</div>
+
+<!-- Joystick -->
+<div id="joystick" aria-hidden="true">
+  <div id="joy-base"></div>
+  <div id="joy-stick"></div>
+</div>
+
+<!-- Include the ad and payment integration files -->
+<script src="ads-integration.js"></script>
+<script src="payment-integration.js"></script>
+
+<script>
+/* ========== Setup ========== */
+const canvas = document.getElementById('game');
+const ctx = canvas.getContext('2d', { alpha: false });
+let W = canvas.width = innerWidth;
+let H = canvas.height = innerHeight;
+addEventListener('resize', ()=>{ W = canvas.width = innerWidth; H = canvas.height = innerHeight; });
+
+/* Mobile detection */
+const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || 
+                 ('ontouchstart' in window) || 
+                 (navigator.maxTouchPoints > 0) ||
+                 (window.innerWidth <= 768);
+
+/* ======= Game State ======= */
+let player = { x: W/2, y: H/2, r: 16, speed: 6 };
+let enemies = [];
+let coins = [];
+let particles = [];
+let score = 100;
+let coinCount = 0;
+let lives = 3;
+let gameOver = false;
+let gamePaused = false;
+let spawnInterval = 2000;
+let lastSpawn = performance.now();
+let lastCoinSpawn = performance.now();
+let lastTick = performance.now();
+let highScore = parseInt(localStorage.getItem('ca_high')||"0",10) || 0;
+
+/* Settings */
+let settings = {
+  musicEnabled: localStorage.getItem('ca_music') !== 'false',
+  sfxEnabled: localStorage.getItem('ca_sfx') !== 'false',
+  difficulty: localStorage.getItem('ca_difficulty') || 'normal',
+  hapticEnabled: localStorage.getItem('ca_haptic') !== 'false'
+};
+
+/* Achievements */
+let achievements = {
+  firstBlood: { name: "First Blood", desc: "Survive your first hit", earned: false },
+  coinCollector: { name: "Coin Collector", desc: "Collect 50 coins in one game", earned: false, progress: 0 },
+  survivor: { name: "Survivor", desc: "Survive for 2 minutes", earned: false },
+  powerUser: { name: "Power User", desc: "Use all 3 power-ups in one game", earned: false, used: [] },
+  highScorer: { name: "High Scorer", desc: "Score 500 points", earned: false },
+  speedDemon: { name: "Speed Demon", desc: "Collect 10 coins in 30 seconds", earned: false, lastCoinTime: 0 },
+  shieldMaster: { name: "Shield Master", desc: "Block 5 hits with shield", earned: false, blocks: 0 },
+  marathon: { name: "Marathon Runner", desc: "Survive for 5 minutes", earned: false }
+};
+
+let earnedAchievements = JSON.parse(localStorage.getItem('ca_achievements') || '[]');
+earnedAchievements.forEach(id => {
+  if (achievements[id]) achievements[id].earned = true;
+});
+
+/* powerups */
+let power = { shield:false, double:false, slow:false, regen:false };
+let powerTimers = { shield:0, double:0, slow:0, regen:0 };
+
+/* Enemy killing system */
+let specialAttack = {
+  available: true,
+  cooldown: 8000, // 8 seconds
+  lastUsed: 0,
+  charge: 0,
+  maxCharge: 3
+};
+
+/* Boss encounters */
+let bossActive = false;
+let bossSpawnTimer = 30000; // 30 seconds
+let lastBossSpawn = performance.now();
+let bossHealth = 0;
+let bossMaxHealth = 0;
+
+/* Progression system */
+let playerLevel = parseInt(localStorage.getItem('ca_level') || '1');
+let playerXP = parseInt(localStorage.getItem('ca_xp') || '0');
+let totalCoins = parseInt(localStorage.getItem('ca_total_coins') || '0');
+let gamesPlayed = parseInt(localStorage.getItem('ca_games_played') || '0');
+let totalScore = parseInt(localStorage.getItem('ca_total_score') || '0');
+
+let upgrades = {
+  speed: parseInt(localStorage.getItem('ca_upgrade_speed') || '0'),
+  shield: parseInt(localStorage.getItem('ca_upgrade_shield') || '0'),
+  coinMagnet: parseInt(localStorage.getItem('ca_upgrade_magnet') || '0'),
+  extraLife: parseInt(localStorage.getItem('ca_upgrade_life') || '0')
+};
+
+/* Visual upgrades and customization */
+let visualUpgrades = {
+  playerSkin: localStorage.getItem('ca_player_skin') || 'default',
+  particleStyle: localStorage.getItem('ca_particle_style') || 'default',
+  backgroundTheme: localStorage.getItem('ca_background_theme') || 'default',
+  coinEffect: localStorage.getItem('ca_coin_effect') || 'default'
+};
+
+let unlockedSkins = JSON.parse(localStorage.getItem('ca_unlocked_skins') || '["default"]');
+let unlockedParticles = JSON.parse(localStorage.getItem('ca_unlocked_particles') || '["default"]');
+let unlockedBackgrounds = JSON.parse(localStorage.getItem('ca_unlocked_backgrounds') || '["default"]');
+let unlockedCoinEffects = JSON.parse(localStorage.getItem('ca_unlocked_coin_effects') || '["default"]');
+
+/* Daily challenges */
+let dailyChallenges = {
+  current: JSON.parse(localStorage.getItem('ca_daily_challenges') || '[]'),
+  lastReset: parseInt(localStorage.getItem('ca_daily_reset') || '0'),
+  streak: parseInt(localStorage.getItem('ca_daily_streak') || '0'),
+  completedToday: JSON.parse(localStorage.getItem('ca_completed_today') || '[]')
+};
+
+/* Monetization system */
+let monetization = {
+  premium: localStorage.getItem('ca_premium') === 'true',
+  gems: parseInt(localStorage.getItem('ca_gems') || '0'),
+  adWatched: parseInt(localStorage.getItem('ca_ad_watched') || '0'),
+  lastAdTime: parseInt(localStorage.getItem('ca_last_ad_time') || '0'),
+  adCooldown: 300000, // 5 minutes between ads
+  premiumFeatures: {
+    noAds: false,
+    doubleCoins: false,
+    extraLives: false,
+    customSkins: false,
+    unlimitedSpecial: false
+  }
+};
+
+// Initialize Ad Manager
+let adManager = null;
+let paymentManager = null;
+
+async function initializeMonetization() {
+  console.log('Initializing monetization...');
+  try {
+    // Initialize Ad Manager
+    console.log('Creating AdManager...');
+    adManager = new AdManager();
+    console.log('Initializing AdManager with admob...');
+    await adManager.initialize('admob');
+    console.log('Ad Manager initialized successfully');
+    
+    // Initialize Payment Manager
+    console.log('Creating PaymentManager...');
+    paymentManager = new PaymentManager();
+    
+    // Wait for PayPal SDK to load
+    let paypalLoadAttempts = 0;
+    const maxAttempts = 10;
+    
+    while (!window.paypal && paypalLoadAttempts < maxAttempts) {
+      console.log('Waiting for PayPal SDK to load...', paypalLoadAttempts + 1);
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      paypalLoadAttempts++;
+    }
+    
+    if (window.paypal) {
+      await paymentManager.initializePayPal('AWLLZuzTP2tX72NcpXd6aqQOl24UyK2_bfkBIMhAWQMYVp28fVSe-FOWXRc8yRQoNeondtjavW9Pqynz');
+      console.log('Payment Manager initialized successfully');
+    } else {
+      console.error('PayPal SDK failed to load after', maxAttempts, 'attempts');
+    }
+  } catch (error) {
+    console.error('Monetization initialization failed:', error);
+  }
+}
+
+/* Screen shake effect */
+let screenShake = { x: 0, y: 0, intensity: 0, decay: 0.9 };
+
+/* joystick state */
+const joystickEl = document.getElementById('joystick');
+const joyBase = document.getElementById('joy-base');
+const joyStick = document.getElementById('joy-stick');
+let joystickActive = false;
+let joyOrigin = { x:0, y:0 };
+let joyPointerId = null;
+let joyValue = { x:0, y:0 }; // -1..1
+
+/* UI elements */
+const scoreHud = document.getElementById('scoreHud');
+const powerHud = document.getElementById('powerHud');
+const coinsDisplay = document.getElementById('coinsDisplay');
+const storeEl = document.getElementById('store');
+const gameOverEl = document.getElementById('gameOver');
+const finalScoreEl = document.getElementById('finalScore');
+const bestScoreEl = document.getElementById('bestScore');
+const gameStatsEl = document.getElementById('gameStats');
+
+/* Audio (tiny synth) */
+const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+let musicEnabled = true;
+let musicInterval = null;
+
+function tone(freq, type='sine', t=0.09, g=0.07){
+  const o = audioCtx.createOscillator(); const gg = audioCtx.createGain();
+  o.type=type; o.frequency.value=freq; gg.gain.value=g;
+  o.connect(gg); gg.connect(audioCtx.destination);
+  o.start(); o.stop(audioCtx.currentTime + t);
+  gg.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + t);
+}
+
+function sfxCoin(){ if (settings.sfxEnabled) tone(900,'sine',0.08,0.06); }
+function sfxHit(){ if (settings.sfxEnabled) tone(120,'sawtooth',0.16,0.12); }
+function sfxBuy(){ if (settings.sfxEnabled) tone(520,'triangle',0.12,0.07); }
+function sfxPower(){ if (settings.sfxEnabled) tone(320,'sine',0.16,0.09); }
+
+// Background music
+function startMusic() {
+  if (!settings.musicEnabled) return;
+  const notes = [220, 246.94, 277.18, 293.66, 329.63, 369.99, 415.30]; // A major scale
+  let noteIndex = 0;
+  
+  musicInterval = setInterval(() => {
+    if (!gamePaused && !gameOver && settings.musicEnabled) {
+      const note = notes[noteIndex % notes.length];
+      tone(note, 'triangle', 0.3, 0.02);
+      noteIndex++;
+    }
+  }, 2000);
+}
+
+function stopMusic() {
+  if (musicInterval) {
+    clearInterval(musicInterval);
+    musicInterval = null;
+  }
+}
+
+/* ========== Helpers ========== */
+function rand(a,b){ return Math.random()*(b-a)+a; }
+function dist(ax,ay,bx,by){ const dx=ax-bx, dy=ay-by; return Math.sqrt(dx*dx + dy*dy); }
+
+/* Screen shake function */
+function addScreenShake(intensity = 8) {
+  screenShake.intensity = Math.max(screenShake.intensity, intensity);
+}
+
+/* Haptic feedback for mobile */
+function triggerHaptic() {
+  if (settings.hapticEnabled && navigator.vibrate) {
+    navigator.vibrate(50);
+  }
+}
+
+/* Special attack system */
+function useSpecialAttack() {
+  const now = performance.now();
+  if (!specialAttack.available || now - specialAttack.lastUsed < specialAttack.cooldown) {
+    return false;
+  }
+  
+  specialAttack.available = false;
+  specialAttack.lastUsed = now;
+  
+  // Kill all enemies within range
+  let killedCount = 0;
+  for (let i = enemies.length - 1; i >= 0; i--) {
+    const e = enemies[i];
+    const distance = dist(e.x, e.y, player.x, player.y);
+    if (distance < 120) { // Kill radius
+      if (e.type === 'boss') {
+        e.health -= 25; // Heavy damage to boss
+        if (e.health <= 0) {
+          enemies.splice(i, 1);
+          bossActive = false;
+          score += 200;
+          coinCount += 50;
+          addXP(100);
+        }
+      } else {
+        enemies.splice(i, 1);
+        score += 10;
+        coinCount += 2;
+      }
+      killedCount++;
+      spawnParticles(e.x, e.y, '#ff4444', 8);
+    }
+  }
+  
+  if (killedCount > 0) {
+    addScreenShake(15);
+    if (settings.sfxEnabled) tone(150, 'sawtooth', 0.2, 0.1);
+    triggerHaptic();
+    spawnParticles(player.x, player.y, '#ffaa00', 15);
+  }
+  
+  // Reset after cooldown
+  setTimeout(() => {
+    specialAttack.available = true;
+  }, specialAttack.cooldown);
+  
+  return true;
+}
+
+function updateSpecialAttackButton() {
+  const btn = document.getElementById('specialAttackBtn');
+  if (!btn) return;
+  
+  const now = performance.now();
+  const timeSinceLastUse = now - specialAttack.lastUsed;
+  const cooldownProgress = Math.min(1, timeSinceLastUse / specialAttack.cooldown);
+  
+  if (specialAttack.available) {
+    btn.disabled = false;
+    btn.textContent = 'Special Attack';
+    btn.style.background = 'linear-gradient(45deg,#FF5722,#D84315)';
+  } else {
+    btn.disabled = true;
+    btn.textContent = `${Math.ceil((specialAttack.cooldown - timeSinceLastUse) / 1000)}s`;
+    btn.style.background = `linear-gradient(45deg, rgba(255,87,34,${0.3 + cooldownProgress * 0.7}), rgba(216,67,21,${0.3 + cooldownProgress * 0.7}))`;
+  }
+}
+
+/* Daily challenge system */
+function generateDailyChallenges() {
+  const challenges = [
+    { id: 'collect_coins', name: 'Coin Collector', desc: 'Collect 50 coins', target: 50, progress: 0, reward: 100 },
+    { id: 'survive_time', name: 'Survivor', desc: 'Survive for 3 minutes', target: 180, progress: 0, reward: 150 },
+    { id: 'kill_enemies', name: 'Enemy Hunter', desc: 'Kill 10 enemies with special attack', target: 10, progress: 0, reward: 200 },
+    { id: 'score_points', name: 'High Scorer', desc: 'Score 300 points', target: 300, progress: 0, reward: 120 },
+    { id: 'use_powerups', name: 'Power User', desc: 'Use 5 power-ups', target: 5, progress: 0, reward: 80 },
+    { id: 'avoid_damage', name: 'Untouchable', desc: 'Survive 2 minutes without taking damage', target: 120, progress: 0, reward: 250 }
+  ];
+  
+  // Select 3 random challenges
+  const selected = [];
+  const shuffled = challenges.sort(() => 0.5 - Math.random());
+  for (let i = 0; i < 3; i++) {
+    selected.push({...shuffled[i]});
+  }
+  
+  return selected;
+}
+
+function checkDailyChallenges() {
+  const now = Date.now();
+  const dayStart = new Date().setHours(0, 0, 0, 0);
+  
+  // Reset challenges if it's a new day
+  if (dailyChallenges.lastReset < dayStart) {
+    dailyChallenges.current = generateDailyChallenges();
+    dailyChallenges.lastReset = dayStart;
+    dailyChallenges.completedToday = [];
+    localStorage.setItem('ca_daily_challenges', JSON.stringify(dailyChallenges.current));
+    localStorage.setItem('ca_daily_reset', dailyChallenges.lastReset.toString());
+    localStorage.setItem('ca_completed_today', JSON.stringify(dailyChallenges.completedToday));
+  }
+  
+  // Check challenge progress
+  dailyChallenges.current.forEach(challenge => {
+    if (dailyChallenges.completedToday.includes(challenge.id)) return;
+    
+    let completed = false;
+    switch(challenge.id) {
+      case 'collect_coins':
+        challenge.progress = coinCount;
+        completed = coinCount >= challenge.target;
+        break;
+      case 'survive_time':
+        challenge.progress = Math.floor((performance.now() - lastSpawn) / 1000);
+        completed = challenge.progress >= challenge.target;
+        break;
+      case 'score_points':
+        challenge.progress = Math.floor(score);
+        completed = score >= challenge.target;
+        break;
+    }
+    
+    if (completed) {
+      completeDailyChallenge(challenge);
+    }
+  });
+}
+
+function completeDailyChallenge(challenge) {
+  if (dailyChallenges.completedToday.includes(challenge.id)) return;
+  
+  dailyChallenges.completedToday.push(challenge.id);
+  dailyChallenges.streak++;
+  
+  // Award rewards
+  coinCount += challenge.reward;
+  addXP(challenge.reward / 2);
+  
+  // Save progress
+  localStorage.setItem('ca_completed_today', JSON.stringify(dailyChallenges.completedToday));
+  localStorage.setItem('ca_daily_streak', dailyChallenges.streak.toString());
+  
+  // Show notification
+  showChallengeNotification(challenge.name, challenge.reward);
+}
+
+function showChallengeNotification(name, reward) {
+  const notification = document.createElement('div');
+  notification.style.cssText = `
+    position: fixed; top: 20px; left: 20px; background: linear-gradient(45deg, #4CAF50, #45a049);
+    color: #fff; padding: 12px 16px; border-radius: 8px; z-index: 1000;
+    font-weight: bold; box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+    transform: translateX(-100%); transition: transform 0.3s ease;
+  `;
+  notification.textContent = `🎯 ${name} +${reward} coins`;
+  document.body.appendChild(notification);
+  
+  setTimeout(() => notification.style.transform = 'translateX(0)', 100);
+  setTimeout(() => {
+    notification.style.transform = 'translateX(-100%)';
+    setTimeout(() => document.body.removeChild(notification), 300);
+  }, 3000);
+}
+
+/* Achievement checking */
+function checkAchievements() {
+  const now = performance.now();
+  
+  // First Blood - triggered on first hit
+  if (!achievements.firstBlood.earned && lives < 3) {
+    unlockAchievement('firstBlood');
+  }
+  
+  // Coin Collector
+  if (!achievements.coinCollector.earned && coinCount >= 50) {
+    unlockAchievement('coinCollector');
+  }
+  
+  // Survivor - 2 minutes
+  if (!achievements.survivor.earned && (now - lastSpawn) > 120000) {
+    unlockAchievement('survivor');
+  }
+  
+  // High Scorer
+  if (!achievements.highScorer.earned && score >= 500) {
+    unlockAchievement('highScorer');
+  }
+  
+  // Speed Demon
+  if (!achievements.speedDemon.earned) {
+    if (now - achievements.speedDemon.lastCoinTime < 30000) {
+      achievements.speedDemon.progress = (achievements.speedDemon.progress || 0) + 1;
+      if (achievements.speedDemon.progress >= 10) {
+        unlockAchievement('speedDemon');
+      }
+    } else {
+      achievements.speedDemon.progress = 1;
+    }
+    achievements.speedDemon.lastCoinTime = now;
+  }
+  
+  // Marathon - 5 minutes
+  if (!achievements.marathon.earned && (now - lastSpawn) > 300000) {
+    unlockAchievement('marathon');
+  }
+}
+
+function unlockAchievement(id) {
+  if (achievements[id] && !achievements[id].earned) {
+    achievements[id].earned = true;
+    earnedAchievements.push(id);
+    localStorage.setItem('ca_achievements', JSON.stringify(earnedAchievements));
+    
+    // Show achievement notification
+    showAchievementNotification(achievements[id].name);
+    
+    // Award XP
+    addXP(50);
+  }
+}
+
+function showAchievementNotification(name) {
+  const notification = document.createElement('div');
+  notification.style.cssText = `
+    position: fixed; top: 20px; right: 20px; background: linear-gradient(45deg, #ffd700, #ffed4e);
+    color: #000; padding: 12px 16px; border-radius: 8px; z-index: 1000;
+    font-weight: bold; box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+    transform: translateX(100%); transition: transform 0.3s ease;
+  `;
+  notification.textContent = `🏆 ${name}`;
+  document.body.appendChild(notification);
+  
+  setTimeout(() => notification.style.transform = 'translateX(0)', 100);
+  setTimeout(() => {
+    notification.style.transform = 'translateX(100%)';
+    setTimeout(() => document.body.removeChild(notification), 300);
+  }, 3000);
+}
+
+/* Progression system */
+function addXP(amount) {
+  playerXP += amount;
+  const xpNeeded = playerLevel * 100;
+  
+  if (playerXP >= xpNeeded) {
+    playerLevel++;
+    playerXP -= xpNeeded;
+    showLevelUpNotification();
+  }
+  
+  localStorage.setItem('ca_xp', playerXP.toString());
+  localStorage.setItem('ca_level', playerLevel.toString());
+}
+
+function showLevelUpNotification() {
+  const notification = document.createElement('div');
+  notification.style.cssText = `
+    position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
+    background: linear-gradient(45deg, #00e0b8, #7ee7d9); color: #000;
+    padding: 20px; border-radius: 12px; z-index: 1000;
+    font-weight: bold; font-size: 18px; text-align: center;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+  `;
+  notification.innerHTML = `🎉 LEVEL UP!<br>Level ${playerLevel}`;
+  document.body.appendChild(notification);
+  
+  setTimeout(() => {
+    notification.style.opacity = '0';
+    setTimeout(() => document.body.removeChild(notification), 500);
+  }, 2000);
+}
+
+/* ========== Entities ========== */
+function spawnEnemy(){
+  // spawn at random edge with visual variety based on type
+  const side = Math.floor(Math.random()*4);
+  let x,y;
+  if (side===0){ x = rand(0,W); y = -30; }
+  else if (side===1){ x = rand(0,W); y = H+30; }
+  else if (side===2){ x = -30; y = rand(0,H); }
+  else { x = W+30; y = rand(0,H); }
+  
+  const typeRand = Math.random();
+  let type = 'chaser';
+  let color = '#ff7b7b';
+  let size = rand(12,18);
+  
+  if (typeRand < 0.18) { 
+    type = 'sprinter'; 
+    color = '#ff4757'; 
+    size = rand(10,14);
+  }
+  else if (typeRand < 0.36) { 
+    type = 'zigzag'; 
+    color = '#ff6b6b'; 
+    size = rand(14,20);
+  }
+  else if (typeRand < 0.54) { 
+    type = 'stalker'; 
+    color = '#ff3838'; 
+    size = rand(16,22);
+  }
+  
+  const enemy = { 
+    x, y, r: size, type, baseSpeed: rand(0.8,1.6), 
+    frame: 0, frameT: 0, color: color,
+    pulse: 0, // for visual effects
+    zig: 0, // for zigzag movement
+    sprintT: 0, sprintActive: false, sprintFor: 0, sprintStart: 0, sprintCooldown: 1000 + Math.random()*3000
+  };
+  enemies.push(enemy);
+}
+
+function spawnBoss(){
+  if (bossActive) return;
+  
+  bossActive = true;
+  bossMaxHealth = 50 + (playerLevel * 10);
+  bossHealth = bossMaxHealth;
+  
+  const boss = {
+    x: W/2, y: -50, r: 35, type: 'boss', baseSpeed: 1.2,
+    frame: 0, frameT: 0, color: '#ff0000',
+    pulse: 0, health: bossHealth, maxHealth: bossMaxHealth,
+    attackTimer: 0, attackCooldown: 2000,
+    phase: 0, phaseTimer: 0
+  };
+  
+  enemies.push(boss);
+  addScreenShake(15);
+  if (settings.sfxEnabled) tone(80, 'sawtooth', 0.5, 0.1);
+}
+
+function spawnCoin(){
+  const c = { x: rand(30, W-30), y: rand(60, H-120), r: 9, life: performance.now() + 20000 };
+  coins.push(c);
+}
+
+/* particle */
+function spawnParticles(x,y,color,count=8){
+  for (let i=0;i<count;i++){
+    let particleColor = color;
+    
+    // Apply particle style effects
+    switch(visualUpgrades.particleStyle) {
+      case 'sparkle':
+        particleColor = ['#ffd700', '#ffed4e', '#fff7d8'][Math.floor(Math.random() * 3)];
+        break;
+      case 'smoke':
+        particleColor = ['#666', '#888', '#aaa'][Math.floor(Math.random() * 3)];
+        break;
+      case 'rainbow':
+        const rainbowColors = ['#ff0000', '#ff8000', '#ffff00', '#80ff00', '#00ff00', '#00ff80', '#00ffff', '#0080ff', '#0000ff', '#8000ff', '#ff00ff', '#ff0080'];
+        particleColor = rainbowColors[Math.floor(Math.random() * rainbowColors.length)];
+        break;
+    }
+    
+    particles.push({ 
+      x, y, 
+      vx:(Math.random()-0.5)*3, 
+      vy:(Math.random()-1.8)*3, 
+      born: performance.now(), 
+      life: 400+Math.random()*600, 
+      c: particleColor,
+      style: visualUpgrades.particleStyle
+    });
+  }
+}
+
+/* ========== Movement & Input ========== */
+
+/* Mouse follow for desktop */
+let mouseControl = true;
+addEventListener('mousemove', e=>{
+  mouseControl = true;
+  player.x = e.clientX;
+  player.y = e.clientY;
+});
+
+/* Touch controls:
+   - If you touch the left 40% of screen we show joystick which controls player speed/direction.
+   - If you touch elsewhere and drag, that finger directly moves player to the touch.
+*/
+addEventListener('touchstart', (e) => {
+  // resume audio context on first user gesture
+  if (audioCtx.state === 'suspended') audioCtx.resume();
+  const t = e.changedTouches[0];
+  const tx = t.clientX, ty = t.clientY;
+  // prefer joystick if touch begins on left 45% of screen
+  if (tx < window.innerWidth * 0.45){
+    // use joystick — create origin at touch
+    joystickActive = true;
+    joyPointerId = t.identifier;
+    joyOrigin = { x: tx, y: ty };
+    showJoystickAt(joyOrigin.x, joyOrigin.y);
+    updateJoystick(joyOrigin.x, joyOrigin.y); // center
+  } else {
+    // direct drag movement: map that finger to player position
+    mouseControl = false;
+    player.x = tx; player.y = ty;
+  }
+}, {passive:true});
+
+addEventListener('touchmove', (e) => {
+  const touches = e.changedTouches;
+  for (let i=0;i<touches.length;i++){
+    const t = touches[i];
+    if (joystickActive && t.identifier === joyPointerId){
+      const dx = t.clientX - joyOrigin.x;
+      const dy = t.clientY - joyOrigin.y;
+      // normalize into -1..1 by joystick radius
+      const maxR = joystickEl.clientWidth * 0.42;
+      const nx = Math.max(-1, Math.min(1, dx / maxR));
+      const ny = Math.max(-1, Math.min(1, dy / maxR));
+      joyValue.x = nx; joyValue.y = ny;
+      const stickX = joyOrigin.x + nx * maxR;
+      const stickY = joyOrigin.y + ny * maxR;
+      moveJoyStickTo(stickX, stickY);
+    } else {
+      // other touch — direct control
+      player.x = t.clientX; player.y = t.clientY;
+      mouseControl = false;
+    }
+  }
+}, {passive:true});
+
+addEventListener('touchend', (e) => {
+  for (let i=0;i<e.changedTouches.length;i++){
+    const t = e.changedTouches[i];
+    if (joystickActive && t.identifier === joyPointerId){
+      // release joystick
+      joystickActive = false;
+      joyPointerId = null;
+      hideJoystick();
+      joyValue.x = 0; joyValue.y = 0;
+    }
+  }
+}, {passive:true});
+
+/* show/hide joystick visuals */
+function showJoystickAt(x,y){
+  joystickEl.style.display = 'block';
+  joystickEl.style.left = (x - joystickEl.clientWidth/2) + 'px';
+  joystickEl.style.bottom = (window.innerHeight - y - joystickEl.clientHeight/2) + 'px';
+  // place center stick
+  moveJoyStickTo(x, y);
+}
+function hideJoystick(){ joystickEl.style.display = 'none'; joyStick.style.transform = 'translate(-50%,-50%)'; }
+
+/* position inner stick element */
+function moveJoyStickTo(screenX, screenY){
+  const parentRect = joystickEl.getBoundingClientRect();
+  const localX = screenX - parentRect.left;
+  const localY = screenY - parentRect.top;
+  joyStick.style.left = localX + 'px';
+  joyStick.style.top = localY + 'px';
+}
+
+/* desktop keyboard fallback for debugging */
+addEventListener('keydown', e=>{
+  if (e.key === 's' || e.key === 'S') toggleStore();
+  if (e.key === 'r' || e.key === 'R') restart();
+  if (e.key === 'p' || e.key === 'P') togglePause();
+  if (e.key === 'Escape') toggleSettings();
+  if (e.key === 'v' || e.key === 'V') toggleUpgradeShop();
+  if (e.key === 'c' || e.key === 'C') toggleDailyChallenges();
+  if (e.key === 'g' || e.key === 'G') togglePremiumShop();
+  if (e.key === ' ') useSpecialAttack(); // Spacebar for special attack
+});
+
+/* Settings management */
+function toggleSettings() {
+  const settingsMenu = document.getElementById('settingsMenu');
+  const isVisible = settingsMenu.style.display === 'block';
+  
+  if (!isVisible) {
+    // Load current settings into UI
+    document.getElementById('musicToggle').checked = settings.musicEnabled;
+    document.getElementById('sfxToggle').checked = settings.sfxEnabled;
+    document.getElementById('hapticToggle').checked = settings.hapticEnabled;
+    document.getElementById('difficultySelect').value = settings.difficulty;
+    
+    settingsMenu.style.display = 'block';
+  } else {
+    settingsMenu.style.display = 'none';
+  }
+}
+
+function closeSettings() {
+  document.getElementById('settingsMenu').style.display = 'none';
+}
+
+// Settings event listeners
+document.addEventListener('DOMContentLoaded', function() {
+  const musicToggle = document.getElementById('musicToggle');
+  const sfxToggle = document.getElementById('sfxToggle');
+  const hapticToggle = document.getElementById('hapticToggle');
+  const difficultySelect = document.getElementById('difficultySelect');
+  
+  musicToggle.addEventListener('change', function() {
+    settings.musicEnabled = this.checked;
+    localStorage.setItem('ca_music', this.checked.toString());
+    if (!this.checked) {
+      stopMusic();
+    } else if (!gameOver && !gamePaused) {
+      startMusic();
+    }
+  });
+  
+  sfxToggle.addEventListener('change', function() {
+    settings.sfxEnabled = this.checked;
+    localStorage.setItem('ca_sfx', this.checked.toString());
+  });
+  
+  hapticToggle.addEventListener('change', function() {
+    settings.hapticEnabled = this.checked;
+    localStorage.setItem('ca_haptic', this.checked.toString());
+  });
+  
+  difficultySelect.addEventListener('change', function() {
+    settings.difficulty = this.value;
+    localStorage.setItem('ca_difficulty', this.value);
+    applyDifficultySettings();
+  });
+});
+
+function applyDifficultySettings() {
+  switch(settings.difficulty) {
+    case 'easy':
+      spawnInterval = 2500;
+      break;
+    case 'normal':
+      spawnInterval = 2000;
+      break;
+    case 'hard':
+      spawnInterval = 1500;
+      break;
+  }
+}
+
+/* ========== Game Logic ========== */
+function update(dt){
+  // spawn enemies & coins
+  const now = performance.now();
+  if (now - lastSpawn > spawnInterval){
+    spawnEnemy();
+    lastSpawn = now;
+    // slowly ramp difficulty
+    spawnInterval = Math.max(450, spawnInterval - 6);
+  }
+  
+  // Boss spawning
+  if (!bossActive && now - lastBossSpawn > bossSpawnTimer) {
+    spawnBoss();
+    lastBossSpawn = now;
+  }
+  
+  if (now - lastCoinSpawn > 3000){
+    spawnCoin(); lastCoinSpawn = now;
+  }
+  if (now - lastTick > 1000){
+    // passive coin tick
+    coinCount += (power.double ? 2 : 1);
+    score += (power.double ? 1 : 0.3);
+    lastTick = now;
+  }
+
+  // Check achievements
+  checkAchievements();
+  checkDailyChallenges(); // Check daily challenges
+
+  // joystick movement if active
+  if (joystickActive){
+    // joyValue range -1..1, scale player speed
+    const vx = joyValue.x * player.speed;
+    const vy = joyValue.y * player.speed;
+    player.x += vx;
+    player.y += vy;
+  }
+
+  // clamp player inside
+  player.x = Math.max(20, Math.min(W-20, player.x));
+  player.y = Math.max(20, Math.min(H-20, player.y));
+
+  // update enemies
+  for (let i = enemies.length -1; i >=0; i--){
+    const e = enemies[i];
+    
+    // Boss special logic
+    if (e.type === 'boss') {
+      // Boss movement pattern
+      e.phaseTimer += dt;
+      if (e.phaseTimer > 5000) {
+        e.phase = (e.phase + 1) % 3;
+        e.phaseTimer = 0;
+      }
+      
+      // Boss phases: 0=chase, 1=circle, 2=charge
+      if (e.phase === 0) {
+        // Chase player
+        let dx = player.x - e.x, dy = player.y - e.y;
+        let d = Math.max(0.0001, Math.sqrt(dx*dx + dy*dy));
+        e.x += (dx / d) * e.baseSpeed * (dt*0.06);
+        e.y += (dy / d) * e.baseSpeed * (dt*0.06);
+      } else if (e.phase === 1) {
+        // Circle around player
+        const angle = e.phaseTimer * 0.001;
+        const radius = 100;
+        e.x = player.x + Math.cos(angle) * radius;
+        e.y = player.y + Math.sin(angle) * radius;
+      } else {
+        // Charge attack
+        e.x += (player.x - e.x) * 0.1;
+        e.y += (player.y - e.y) * 0.1;
+      }
+      
+      // Boss attack
+      e.attackTimer += dt;
+      if (e.attackTimer > e.attackCooldown) {
+        // Spawn mini enemies
+        for (let j = 0; j < 3; j++) {
+          const miniEnemy = {
+            x: e.x + (Math.random() - 0.5) * 50,
+            y: e.y + (Math.random() - 0.5) * 50,
+            r: 8, type: 'mini', baseSpeed: 2,
+            frame: 0, frameT: 0, color: '#ff6666',
+            pulse: 0
+          };
+          enemies.push(miniEnemy);
+        }
+        e.attackTimer = 0;
+      }
+    } else {
+      // Regular enemy behavior
+      let dx = player.x - e.x, dy = player.y - e.y;
+      let d = Math.max(0.0001, Math.sqrt(dx*dx + dy*dy));
+      let vx = dx / d, vy = dy / d;
+      if (e.type === 'zigzag'){ e.zig = (e.zig || 0) + dt*0.004; const off = Math.sin(e.zig)*0.8; vx = (dx/d) - off*(dy/d); vy = (dy/d) + off*(dx/d); }
+      else if (e.type === 'sprinter'){ e.sprintT = (e.sprintT || 0) + dt; if (!e.sprintActive && e.sprintT > e.sprintCooldown){ e.sprintActive = true; e.sprintFor = 200 + Math.random()*400; e.sprintStart = performance.now(); } if (e.sprintActive){ if (performance.now() - e.sprintStart > e.sprintFor){ e.sprintActive=false; e.sprintT=0; e.sprintCooldown = 1000 + Math.random()*3000; } } }
+      const speed = (e.sprintActive ? e.baseSpeed * 2.1 : e.baseSpeed) * (power.slow ? 0.45 : 1);
+      e.x += vx * speed * (dt*0.06);
+      e.y += vy * speed * (dt*0.06);
+    }
+    
+    // animate
+    e.frameT = (e.frameT || 0) + dt; if (e.frameT > 140){ e.frame = (e.frame+1)%4; e.frameT = 0; }
+    
+    // check collision
+    const dd = dist(e.x,e.y, player.x, player.y);
+    if (dd < e.r + player.r){
+      // collision happens
+      if (e.type === 'boss') {
+        // Boss collision - damage boss
+        e.health -= 10;
+        if (e.health <= 0) {
+          // Boss defeated
+          enemies.splice(i, 1);
+          bossActive = false;
+          score += 200;
+          coinCount += 50;
+          addXP(100);
+          addScreenShake(20);
+          spawnParticles(e.x, e.y, '#ffd700', 20);
+          if (settings.sfxEnabled) tone(200, 'sine', 0.3, 0.1);
+        } else {
+          // Boss hit
+          addScreenShake(12);
+          spawnParticles(e.x, e.y, '#ff6666', 15);
+        }
+      } else {
+        // Regular enemy collision
+        if (!power.shield){
+          score -= 15;
+          lives -= 1;
+          if (settings.sfxEnabled) sfxHit();
+          spawnParticles(player.x, player.y, '#ffb3b3', 12);
+          addScreenShake(); // trigger screen shake on hit
+          triggerHaptic(); // haptic feedback
+        } else {
+          if (settings.sfxEnabled) sfxPower();
+          spawnParticles(player.x, player.y, '#9df2d6', 8);
+          // Track shield blocks for achievement
+          if (achievements.shieldMaster && !achievements.shieldMaster.earned) {
+            achievements.shieldMaster.blocks = (achievements.shieldMaster.blocks || 0) + 1;
+            if (achievements.shieldMaster.blocks >= 5) {
+              unlockAchievement('shieldMaster');
+            }
+          }
+        }
+        coinCount += 5; // reward on contact
+        // push enemy away or respawn
+        e.x = rand(-50, W+50); e.y = rand(-50, H+50);
+        if (lives <= 0 || score <= 0){
+          endGame();
+        }
+      }
+    }
+  }
+
+  // update coins (collection)
+  for (let i = coins.length -1; i >=0; i--){
+    const c = coins[i];
+    // expiration
+    if (now > c.life){ coins.splice(i,1); continue; }
+    const d = dist(c.x, c.y, player.x, player.y);
+    if (d < c.r + player.r){
+      coins.splice(i,1);
+      coinCount += (power.double ? 2 : 1);
+      score += (power.double ? 5 : 3);
+      if (settings.sfxEnabled) sfxCoin();
+      spawnParticles(c.x, c.y, '#ffd86b', 10);
+      triggerHaptic(); // haptic feedback for coin collection
+    }
+  }
+
+  // particles update
+  for (let i = particles.length -1; i >=0; i--){
+    const p = particles[i];
+    const age = now - p.born;
+    if (age > p.life){ particles.splice(i,1); continue; }
+    p.vy += 0.04; p.x += p.vx; p.y += p.vy;
+  }
+
+  // powerups timers - auto-disable
+  ['shield','double','slow','regen'].forEach(k=>{
+    if (power[k] && powerTimers[k] && performance.now() > powerTimers[k]){
+      power[k] = false;
+      // regen effect removed after timeout
+    }
+  });
+
+  // small passive score gain
+  score += (power.double ? 0.06 : 0.02) * (dt/16.6);
+}
+
+/* ========== Rendering ========== */
+function draw(){
+  // Apply screen shake
+  const shakeX = screenShake.intensity > 0 ? (Math.random() - 0.5) * screenShake.intensity : 0;
+  const shakeY = screenShake.intensity > 0 ? (Math.random() - 0.5) * screenShake.intensity : 0;
+  
+  // Update screen shake decay
+  if (screenShake.intensity > 0) {
+    screenShake.intensity *= screenShake.decay;
+    if (screenShake.intensity < 0.1) screenShake.intensity = 0;
+  }
+  
+  // background gradient
+  const g = ctx.createLinearGradient(0,0,0,H);
+  g.addColorStop(0,'rgba(27,43,100,0.9)');
+  g.addColorStop(1,'rgba(6,10,22,0.95)');
+  ctx.fillStyle = g;
+  ctx.fillRect(0,0,W,H);
+
+  // faint stars/specks
+  for (let s=0;s<6;s++){
+    ctx.fillStyle = 'rgba(255,255,255,0.02)';
+    ctx.fillRect((s*73 + (performance.now()*0.01))%W, (s*41 + (performance.now()*0.02))%H, 1,1);
+  }
+
+  // draw coins
+  for (const c of coins){
+    ctx.beginPath();
+    const grd = ctx.createRadialGradient(c.x, c.y, 2, c.x, c.y, c.r);
+    grd.addColorStop(0, '#fff7d8'); grd.addColorStop(0.5,'#ffd86b'); grd.addColorStop(1,'#c48b10');
+    ctx.fillStyle = grd;
+    ctx.shadowColor = '#ffd86b'; ctx.shadowBlur = 14;
+    ctx.arc(c.x + shakeX, c.y + shakeY, c.r, 0, Math.PI*2); ctx.fill();
+    ctx.shadowBlur = 0;
+  }
+
+  // draw player with glow
+  ctx.beginPath();
+  let playerColor = power.shield ? '#7ee7d9' : '#a6ffd9';
+  
+  // Apply skin effects
+  switch(visualUpgrades.playerSkin) {
+    case 'neon':
+      playerColor = power.shield ? '#ff00ff' : '#00ffff';
+      break;
+    case 'fire':
+      playerColor = power.shield ? '#ff6600' : '#ff4400';
+      break;
+    case 'ice':
+      playerColor = power.shield ? '#00ccff' : '#0099ff';
+      break;
+  }
+  
+  ctx.fillStyle = playerColor;
+  ctx.shadowColor = playerColor; ctx.shadowBlur = 22;
+  ctx.arc(player.x + shakeX, player.y + shakeY, player.r, 0, Math.PI*2); ctx.fill();
+  ctx.shadowBlur = 0;
+  
+  // Draw special attack indicator
+  if (!specialAttack.available) {
+    const cooldownProgress = Math.min(1, (performance.now() - specialAttack.lastUsed) / specialAttack.cooldown);
+    ctx.beginPath();
+    ctx.strokeStyle = '#ffaa00';
+    ctx.lineWidth = 3;
+    ctx.globalAlpha = 0.6;
+    ctx.arc(player.x + shakeX, player.y + shakeY, player.r + 8, 0, Math.PI * 2 * cooldownProgress);
+    ctx.stroke();
+    ctx.globalAlpha = 1;
+  } else {
+    // Show special attack ready indicator
+    ctx.beginPath();
+    ctx.strokeStyle = '#ffaa00';
+    ctx.lineWidth = 2;
+    ctx.globalAlpha = 0.8;
+    ctx.arc(player.x + shakeX, player.y + shakeY, player.r + 6, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.globalAlpha = 1;
+  }
+
+  // draw enemies with improved visuals
+  for (const e of enemies){
+    // Update enemy pulse animation
+    e.pulse = (e.pulse || 0) + 0.1;
+    const pulseScale = 1 + Math.sin(e.pulse) * 0.1;
+    
+    ctx.beginPath();
+    ctx.fillStyle = e.color;
+    ctx.shadowColor = e.color;
+    ctx.shadowBlur = 18;
+    
+    // Draw enemy with pulse effect
+    const drawX = e.x + shakeX;
+    const drawY = e.y + shakeY;
+    const drawR = e.r * pulseScale;
+    
+    ctx.arc(drawX, drawY, drawR, 0, Math.PI*2); 
+    ctx.fill();
+    ctx.shadowBlur = 0;
+    
+    // Add visual indicators based on enemy type
+    if (e.type === 'sprinter' && e.sprintActive) {
+      // Sprint trail effect
+      ctx.strokeStyle = e.color;
+      ctx.lineWidth = 2;
+      ctx.globalAlpha = 0.6;
+      ctx.beginPath();
+      ctx.moveTo(drawX, drawY);
+      ctx.lineTo(drawX - e.r * 2, drawY - e.r * 2);
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+    }
+    
+    // small eye
+    ctx.fillStyle = '#111'; 
+    ctx.fillRect(drawX - drawR*0.25, drawY - drawR*0.45, 3, 3);
+  }
+
+  // draw particles
+  for (const p of particles){
+    const age = performance.now() - p.born;
+    const t = 1 - (age / p.life);
+    ctx.globalAlpha = Math.max(0, t);
+    ctx.fillStyle = p.c;
+    
+    // Apply particle style effects
+    switch(p.style) {
+      case 'sparkle':
+        // Sparkle effect - twinkling particles
+        const sparkle = Math.sin(age * 0.01) * 0.5 + 0.5;
+        ctx.globalAlpha = Math.max(0, t * sparkle);
+        ctx.beginPath();
+        ctx.arc(p.x + shakeX, p.y + shakeY, Math.max(1, t*3), 0, Math.PI*2);
+        ctx.fill();
+        break;
+      case 'smoke':
+        // Smoke effect - larger, slower particles
+        ctx.beginPath();
+        ctx.arc(p.x + shakeX, p.y + shakeY, Math.max(2, t*6), 0, Math.PI*2);
+        ctx.fill();
+        break;
+      case 'rainbow':
+        // Rainbow effect - color cycling
+        const hue = (age * 0.1) % 360;
+        ctx.fillStyle = `hsl(${hue}, 70%, 60%)`;
+        ctx.beginPath();
+        ctx.arc(p.x + shakeX, p.y + shakeY, Math.max(1, t*4), 0, Math.PI*2);
+        ctx.fill();
+        break;
+      default:
+        // Default particles
+        ctx.beginPath();
+        ctx.arc(p.x + shakeX, p.y + shakeY, Math.max(1, t*4), 0, Math.PI*2);
+        ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  // draw joystick if visible (the DOM handles stick visuals)
+  // HUD handled separately
+}
+
+/* ========== Main Loop ========== */
+let lastTime = performance.now();
+function mainLoop(ts){
+  const dt = ts - lastTime; lastTime = ts;
+  if (!gameOver && !gamePaused){
+    update(dt);
+    draw();
+    // update HUD
+    scoreHud.textContent = `Score: ${Math.max(0, Math.floor(score))} • Coins: ${coinCount} • Lives: ${lives} • Level: ${playerLevel}`;
+    
+    // Enhanced power-up HUD with timers
+    const now = performance.now();
+    let powerText = '';
+    if (power.shield) {
+      const timeLeft = Math.max(0, Math.ceil((powerTimers.shield - now) / 1000));
+      powerText += `Shield: ${timeLeft}s • `;
+    } else powerText += 'Shield: OFF • ';
+    
+    if (power.double) {
+      const timeLeft = Math.max(0, Math.ceil((powerTimers.double - now) / 1000));
+      powerText += `Double: ${timeLeft}s • `;
+    } else powerText += 'Double: OFF • ';
+    
+    if (power.slow) {
+      const timeLeft = Math.max(0, Math.ceil((powerTimers.slow - now) / 1000));
+      powerText += `Slow: ${timeLeft}s`;
+    } else powerText += 'Slow: OFF';
+    
+    powerHud.textContent = powerText;
+    coinsDisplay.textContent = `Coins: ${coinCount}`;
+    updateSpecialAttackButton(); // Update button state and cooldown
+    requestAnimationFrame(mainLoop);
+  } else if (gamePaused) {
+    // Draw paused state
+    draw();
+    updateSpecialAttackButton(); // Update button state even when paused
+    requestAnimationFrame(mainLoop);
+  } else {
+    // game over overlay
+    gameOverEl.style.display = 'block';
+    finalScoreEl.textContent = `Final Score: ${Math.floor(score)}`;
+    bestScoreEl.textContent = `Best: ${highScore}`;
+    gameStatsEl.textContent = `Level: ${playerLevel} • Games Played: ${gamesPlayed} • Total Coins: ${totalCoins}`;
+  }
+}
+requestAnimationFrame(mainLoop);
+
+/* ========== Game Over / Restart ========== */
+function endGame(){
+  gameOver = true;
+  stopMusic();
+  
+  // Track statistics
+  gamesPlayed++;
+  totalCoins += coinCount;
+  totalScore += Math.floor(score);
+  
+  // Save statistics
+  localStorage.setItem('ca_games_played', gamesPlayed.toString());
+  localStorage.setItem('ca_total_coins', totalCoins.toString());
+  localStorage.setItem('ca_total_score', totalScore.toString());
+  
+  // save high score
+  if (Math.floor(score) > highScore){ highScore = Math.floor(score); localStorage.setItem('ca_high', String(highScore)); }
+  
+  // Trigger haptic feedback
+  triggerHaptic();
+  
+  if (settings.sfxEnabled) sfxHit();
+}
+
+function togglePause(){
+  if (gameOver) return;
+  gamePaused = !gamePaused;
+  const pauseOverlay = document.getElementById('pauseOverlay');
+  pauseOverlay.style.display = gamePaused ? 'block' : 'none';
+}
+
+function restart(){
+  enemies = []; coins = []; particles = [];
+  score = 100; coinCount = 0; lives = 3; 
+  spawnInterval = 2000; lastSpawn = performance.now();
+  lastCoinSpawn = performance.now(); lastTick = performance.now(); 
+  gameOver = false; gamePaused = false;
+  bossActive = false; lastBossSpawn = performance.now();
+  
+  // Reset special attack
+  specialAttack.available = true;
+  specialAttack.lastUsed = 0;
+  
+  // Apply difficulty settings
+  applyDifficultySettings();
+  
+  gameOverEl.style.display = 'none';
+  document.getElementById('pauseOverlay').style.display = 'none';
+  document.getElementById('settingsMenu').style.display = 'none';
+  document.getElementById('upgradeShop').style.display = 'none';
+  document.getElementById('dailyChallengesMenu').style.display = 'none';
+  document.getElementById('premiumShop').style.display = 'none';
+  document.getElementById('adOverlay').style.display = 'none';
+  
+  startMusic(); // Restart music
+  requestAnimationFrame(mainLoop);
+}
+
+/* ========== Store functions ========== */
+function toggleStore(){ storeEl.style.display = (storeEl.style.display === 'block') ? 'none' : 'block'; }
+function buy(item){
+  // simple shop - uses coinCount
+  if (item === 'shield' && coinCount >= 40){ coinCount -= 40; power.shield = true; powerTimers.shield = performance.now() + 5000; sfxBuy(); spawnParticles(player.x, player.y, '#9df2d6', 12); setTimeout(()=> power.shield=false, 5000); }
+  else if (item === 'double' && coinCount >= 60){ coinCount -= 60; power.double = true; powerTimers.double = performance.now() + 8000; sfxBuy(); setTimeout(()=> power.double=false, 8000); }
+  else if (item === 'slow' && coinCount >= 50){ coinCount -= 50; power.slow = true; powerTimers.slow = performance.now() + 6000; sfxBuy(); setTimeout(()=> power.slow=false, 6000); }
+  else if (item === 'heal' && coinCount >= 45){ coinCount -= 45; score += 40; sfxBuy(); }
+  else if (item === 'life' && coinCount >= 120){ coinCount -= 120; lives += 1; sfxBuy(); }
+  else { flashNotEnough(); }
+}
+
+/* not-enough feedback */
+function flashNotEnough(){ spawnParticles(player.x, player.y, '#ff8080', 12); sfxHit(); }
+
+/* ========== Utility spawns & init ========== */
+/* prepopulate a few enemies & coins for immediate play */
+for (let i=0;i<3;i++) spawnEnemy();
+for (let i=0;i<3;i++) spawnCoin();
+
+/* allow resume audio on first tap */
+addEventListener('click', ()=>{ if (audioCtx.state === 'suspended') audioCtx.resume(); }, { once:true });
+
+/* ========== Download score ========= */
+function downloadScore(){
+  const text = `Final Score: ${Math.floor(score)}\nBest: ${highScore}\nTime: ${new Date().toISOString()}`;
+  const blob = new Blob([text], { type: 'text/plain' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a'); a.href = url; a.download = 'score.txt'; a.click();
+  URL.revokeObjectURL(url);
+}
+
+/* show/hide joystick helper for desktop testing */
+function showJoystick(){ joystickEl.style.display = 'block'; }
+function hideJoystick(){ joystickEl.style.display = 'none'; }
+
+/* Visual upgrade functions */
+function toggleUpgradeShop() {
+  const upgradeShop = document.getElementById('upgradeShop');
+  upgradeShop.style.display = upgradeShop.style.display === 'block' ? 'none' : 'block';
+}
+
+function closeUpgradeShop() {
+  document.getElementById('upgradeShop').style.display = 'none';
+}
+
+function selectSkin(skin) {
+  visualUpgrades.playerSkin = skin;
+  localStorage.setItem('ca_player_skin', skin);
+  
+  // Unlock skin if not already unlocked
+  if (!unlockedSkins.includes(skin)) {
+    unlockedSkins.push(skin);
+    localStorage.setItem('ca_unlocked_skins', JSON.stringify(unlockedSkins));
+  }
+  
+  if (settings.sfxEnabled) sfxBuy();
+}
+
+function selectParticles(style) {
+  visualUpgrades.particleStyle = style;
+  localStorage.setItem('ca_particle_style', style);
+  
+  // Unlock particle style if not already unlocked
+  if (!unlockedParticles.includes(style)) {
+    unlockedParticles.push(style);
+    localStorage.setItem('ca_unlocked_particles', JSON.stringify(unlockedParticles));
+  }
+  
+  if (settings.sfxEnabled) sfxBuy();
+}
+
+/* Daily challenges functions */
+function toggleDailyChallenges() {
+  const dailyMenu = document.getElementById('dailyChallengesMenu');
+  const isVisible = dailyMenu.style.display === 'block';
+  
+  if (!isVisible) {
+    updateDailyChallengesDisplay();
+    dailyMenu.style.display = 'block';
+  } else {
+    dailyMenu.style.display = 'none';
+  }
+}
+
+function closeDailyChallenges() {
+  document.getElementById('dailyChallengesMenu').style.display = 'none';
+}
+
+function updateDailyChallengesDisplay() {
+  const streakDisplay = document.getElementById('streakDisplay');
+  const challengesList = document.getElementById('challengesList');
+  
+  streakDisplay.textContent = dailyChallenges.streak;
+  
+  let challengesHTML = '';
+  dailyChallenges.current.forEach(challenge => {
+    const isCompleted = dailyChallenges.completedToday.includes(challenge.id);
+    const progressPercent = Math.min(100, (challenge.progress / challenge.target) * 100);
+    
+    challengesHTML += `
+      <div style="margin-bottom:10px;padding:8px;background:${isCompleted ? 'rgba(76,175,80,0.2)' : 'rgba(255,255,255,0.05)'};border-radius:6px">
+        <div style="font-weight:bold;margin-bottom:4px">${challenge.name}</div>
+        <div style="font-size:12px;color:var(--muted);margin-bottom:4px">${challenge.desc}</div>
+        <div style="background:rgba(255,255,255,0.1);height:4px;border-radius:2px;overflow:hidden">
+          <div style="background:${isCompleted ? '#4CAF50' : '#00e0b8'};height:100%;width:${progressPercent}%;transition:width 0.3s"></div>
+        </div>
+        <div style="font-size:11px;color:var(--muted);margin-top:4px">
+          ${challenge.progress}/${challenge.target} • Reward: ${challenge.reward} coins
+        </div>
+      </div>
+    `;
+  });
+  
+  challengesList.innerHTML = challengesHTML;
+}
+
+/* Premium Shop functions */
+function togglePremiumShop() {
+  const premiumShop = document.getElementById('premiumShop');
+  const isVisible = premiumShop.style.display === 'block';
+  
+  if (!isVisible) {
+    // Update gem display
+    document.getElementById('gemDisplay').textContent = monetization.gems;
+    
+    // Check if ad is available
+    const now = Date.now();
+    const timeSinceLastAd = now - monetization.lastAdTime;
+    const adBtn = document.getElementById('watchAdBtn');
+    
+    if (timeSinceLastAd < monetization.adCooldown) {
+      const remainingTime = Math.ceil((monetization.adCooldown - timeSinceLastAd) / 1000);
+      adBtn.textContent = `Ad in ${remainingTime}s`;
+      adBtn.disabled = true;
+    } else {
+      adBtn.textContent = 'Watch Ad for 5 Gems';
+      adBtn.disabled = false;
+    }
+    
+    premiumShop.style.display = 'block';
+    
+    // Initialize PayPal buttons when shop opens
+    if (paymentManager && paymentManager.paypal) {
+      initializePayPalButtons();
+    }
+  } else {
+    premiumShop.style.display = 'none';
+  }
+}
+
+function closePremiumShop() {
+  document.getElementById('premiumShop').style.display = 'none';
+}
+
+function initializePayPalButtons() {
+  const container = document.getElementById('paypal-button-container');
+  const fallbackContainer = document.getElementById('fallback-payment');
+  
+  // Check if PayPal SDK is loaded
+  if (!window.paypal) {
+    console.error('PayPal SDK not loaded');
+    container.innerHTML = '<div style="color: #ff6b6b; text-align: center; padding: 10px;">PayPal is loading... Please wait a moment and try again.</div>';
+    // Show fallback payment option
+    if (fallbackContainer) {
+      fallbackContainer.style.display = 'block';
+    }
+    return;
+  }
+  
+  if (!container) {
+    console.error('PayPal button container not found');
+    return;
+  }
+  
+  // Clear existing buttons
+  container.innerHTML = '';
+  
+  // Create PayPal buttons for each gem pack
+  const gemPacks = [
+    { amount: 50, price: 0.99 },
+    { amount: 150, price: 2.99 },
+    { amount: 500, price: 7.99 }
+  ];
+  
+  gemPacks.forEach(pack => {
+    const buttonContainer = document.createElement('div');
+    buttonContainer.style.marginBottom = '10px';
+    container.appendChild(buttonContainer);
+    
+    try {
+      paypal.Buttons({
+        createOrder: (data, actions) => {
+          console.log('Creating PayPal order for', pack.amount, 'gems at $', pack.price);
+          return actions.order.create({
+            purchase_units: [{
+              amount: {
+                value: pack.price.toString()
+              },
+              description: `${pack.amount} Gems Pack`
+            }]
+          });
+        },
+        onApprove: (data, actions) => {
+          console.log('PayPal payment approved, capturing order...');
+          return actions.order.capture().then((details) => {
+            console.log('Payment completed:', details);
+            completePurchase(pack.amount);
+            showGemNotification(pack.amount, `Payment successful! ${pack.amount} gems added.`);
+          });
+        },
+        onError: (err) => {
+          console.error('PayPal payment error:', err);
+          alert(`Payment error: ${err.message || 'Unknown error. Please try again.'}`);
+        },
+        onCancel: (data) => {
+          console.log('PayPal payment cancelled by user');
+        }
+      }).render(buttonContainer).catch(err => {
+        console.error('Failed to render PayPal button:', err);
+        buttonContainer.innerHTML = '<div style="color: #ff6b6b; text-align: center; padding: 10px;">PayPal button failed to load. Please refresh the page.</div>';
+      });
+    } catch (error) {
+      console.error('Error creating PayPal button:', error);
+      buttonContainer.innerHTML = '<div style="color: #ff6b6b; text-align: center; padding: 10px;">PayPal error. Please try again later.</div>';
+    }
+  });
+}
+
+function useFallbackPayment() {
+  const gemPacks = [
+    { amount: 50, price: 0.99 },
+    { amount: 150, price: 2.99 },
+    { amount: 500, price: 7.99 }
+  ];
+  
+  const packOptions = gemPacks.map(pack => `${pack.amount} Gems - $${pack.price}`).join('\n');
+  const selectedPack = prompt(`Select a gem pack:\n\n${packOptions}\n\nEnter the amount (50, 150, or 500):`);
+  
+  const pack = gemPacks.find(p => p.amount.toString() === selectedPack);
+  if (pack) {
+    const confirmed = confirm(`Purchase ${pack.amount} Gems for $${pack.price}?\n\nThis is a demo payment - no real money will be charged.`);
+    if (confirmed) {
+      // Simulate payment processing
+      setTimeout(() => {
+        completePurchase(pack.amount);
+        showGemNotification(pack.amount, `Demo payment successful! ${pack.amount} gems added.`);
+        alert('Demo payment completed! In a real setup, this would process through your payment processor.');
+      }, 2000);
+    }
+  } else {
+    alert('Invalid selection. Please try again.');
+  }
+}
+
+async function watchAdForGems() {
+  console.log('watchAdForGems called');
+  const now = Date.now();
+  if (now - monetization.lastAdTime < monetization.adCooldown) {
+    console.log('Ad cooldown active, cannot watch ad yet');
+    return; // Ad not ready yet
+  }
+  
+  console.log('AdManager status:', adManager ? 'exists' : 'null', adManager?.isInitialized ? 'initialized' : 'not initialized');
+  
+  if (adManager && adManager.isInitialized) {
+    console.log('Using real ad system');
+    try {
+      // Use real ad system
+      const success = await adManager.showRewardedAd();
+      console.log('Real ad result:', success);
+      if (success) {
+        monetization.lastAdTime = now;
+        monetization.adWatched++;
+        localStorage.setItem('ca_last_ad_time', monetization.lastAdTime.toString());
+        localStorage.setItem('ca_ad_watched', monetization.adWatched.toString());
+        return;
+      }
+    } catch (error) {
+      console.error('Error showing real ad:', error);
+    }
+  }
+  
+  console.log('Using fallback simulated ad');
+  // Fallback to simulated ad
+  const adOverlay = document.getElementById('adOverlay');
+  if (adOverlay) {
+    adOverlay.style.display = 'flex';
+    
+    setTimeout(() => {
+      monetization.gems += 5;
+      monetization.lastAdTime = now;
+      monetization.adWatched++;
+      
+      // Save data
+      localStorage.setItem('ca_gems', monetization.gems.toString());
+      localStorage.setItem('ca_last_ad_time', monetization.lastAdTime.toString());
+      localStorage.setItem('ca_ad_watched', monetization.adWatched.toString());
+      
+      const gemDisplay = document.getElementById('gemDisplay');
+      if (gemDisplay) {
+        gemDisplay.textContent = monetization.gems;
+      }
+      closeAd();
+      
+      // Show reward notification
+      showGemNotification(5);
+    }, 5000);
+  } else {
+    // If no overlay available, award gems directly
+    monetization.gems += 5;
+    monetization.lastAdTime = now;
+    monetization.adWatched++;
+    
+    // Save data
+    localStorage.setItem('ca_gems', monetization.gems.toString());
+    localStorage.setItem('ca_last_ad_time', monetization.lastAdTime.toString());
+    localStorage.setItem('ca_ad_watched', monetization.adWatched.toString());
+    
+    const gemDisplay = document.getElementById('gemDisplay');
+    if (gemDisplay) {
+      gemDisplay.textContent = monetization.gems;
+    }
+    
+    // Show reward notification
+    showGemNotification(5);
+  }
+}
+
+function closeAd() {
+  const adOverlay = document.getElementById('adOverlay');
+  if (adOverlay) {
+    adOverlay.style.display = 'none';
+  }
+}
+
+function simulateAdComplete() {
+  const now = Date.now();
+  monetization.gems += 5;
+  monetization.lastAdTime = now;
+  monetization.adWatched++;
+  
+  // Save data
+  localStorage.setItem('ca_gems', monetization.gems.toString());
+  localStorage.setItem('ca_last_ad_time', monetization.lastAdTime.toString());
+  localStorage.setItem('ca_ad_watched', monetization.adWatched.toString());
+  
+  document.getElementById('gemDisplay').textContent = monetization.gems;
+  closeAd();
+  
+  // Show reward notification
+  showGemNotification(5);
+}
+
+function buyPremiumFeature(feature) {
+  const featureCosts = {
+    noAds: 50,
+    doubleCoins: 75,
+    extraLives: 60,
+    customSkins: 40,
+    unlimitedSpecial: 100
+  };
+  
+  const gemsNeeded = featureCosts[feature];
+  
+  if (monetization.gems >= gemsNeeded) {
+    monetization.gems -= gemsNeeded;
+    monetization.premiumFeatures[feature] = true;
+    
+    // Save data
+    localStorage.setItem('ca_gems', monetization.gems.toString());
+    localStorage.setItem('ca_premium', 'true');
+    localStorage.setItem(`ca_premium_${feature}`, 'true');
+    
+    document.getElementById('gemDisplay').textContent = monetization.gems;
+    
+    // Apply premium features
+    applyPremiumFeatures();
+    
+    showGemNotification(-gemsNeeded, `Premium feature "${feature}" unlocked!`);
+    closePremiumShop();
+  } else {
+    alert(`Not enough gems! Need ${gemsNeeded} gems for this feature.`);
+  }
+}
+
+// Payment system for gem packs
+async function buyGemPack(amount) {
+  const gemPackPrices = {
+    50: 0.99,
+    150: 2.99,
+    500: 7.99
+  };
+  
+  const price = gemPackPrices[amount];
+  if (!price) {
+    alert('Invalid gem pack amount');
+    return;
+  }
+  
+  if (paymentManager && paymentManager.paypal) {
+    // Use PayPal payment system
+    const success = await paymentManager.processPayPalPayment(amount, price);
+    if (success) {
+      completePurchase(amount);
+    }
+  } else {
+    // Fallback to simulated payment
+    const paymentMethod = confirm(`Purchase ${amount} Gems for $${price}?\n\nClick OK to proceed with PayPal\nClick Cancel to use credit card`);
+    
+    if (paymentMethod) {
+      usePayPal(amount, price);
+    } else {
+      useCreditCard(amount, price);
+    }
+  }
+}
+
+function usePayPal(amount, price) {
+  // Create PayPal payment with your client ID
+  const paypalUrl = `https://www.paypal.com/cgi-bin/webscr?` +
+    `cmd=_xclick&` +
+    `business=AWLLZuzTP2tX72NcpXd6aqQOl24UyK2_bfkBIMhAWQMYVp28fVSe-FOWXRc8yRQoNeondtjavW9Pqynz&` + // Your PayPal client ID
+    `item_name=${amount} Gems Pack&` +
+    `amount=${price}&` +
+    `currency_code=USD&` +
+    `return=${encodeURIComponent(window.location.href)}&` +
+    `cancel_return=${encodeURIComponent(window.location.href)}&` +
+    `notify_url=${encodeURIComponent(window.location.href)}`;
+  
+  // Open PayPal in new window
+  const paypalWindow = window.open(paypalUrl, 'paypal', 'width=600,height=400');
+  
+  // Check for payment completion
+  const checkPayment = setInterval(() => {
+    if (paypalWindow.closed) {
+      clearInterval(checkPayment);
+      // For demo purposes, assume payment was successful
+      completePurchase(amount);
+    }
+  }, 1000);
+}
+
+function useCreditCard(amount, price) {
+  // Show credit card form
+  const cardForm = `
+    <div style="position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.8);z-index:1000;display:flex;justify-content:center;align-items:center">
+      <div style="background:rgba(0,0,0,0.9);padding:30px;border-radius:12px;max-width:400px;width:90%">
+        <h3 style="margin:0 0 20px 0;text-align:center">💳 Credit Card Payment</h3>
+        <div style="margin-bottom:15px">
+          <label style="display:block;margin-bottom:5px">Card Number</label>
+          <input type="text" id="cardNumber" placeholder="1234 5678 9012 3456" style="width:100%;padding:10px;border:1px solid #555;border-radius:6px;background:#333;color:#fff">
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:15px">
+          <div>
+            <label style="display:block;margin-bottom:5px">Expiry</label>
+            <input type="text" id="cardExpiry" placeholder="MM/YY" style="width:100%;padding:10px;border:1px solid #555;border-radius:6px;background:#333;color:#fff">
+          </div>
+          <div>
+            <label style="display:block;margin-bottom:5px">CVV</label>
+            <input type="text" id="cardCvv" placeholder="123" style="width:100%;padding:10px;border:1px solid #555;border-radius:6px;background:#333;color:#fff">
+          </div>
+        </div>
+        <div style="text-align:center">
+          <button onclick="processCardPayment(${amount}, ${price})" style="background:var(--accent);border:none;padding:12px 24px;border-radius:6px;color:#000;cursor:pointer;margin-right:10px">Pay $${price}</button>
+          <button onclick="closeCardForm()" style="background:transparent;border:1px solid #555;padding:12px 24px;border-radius:6px;color:#fff;cursor:pointer">Cancel</button>
+        </div>
+      </div>
+    </div>
+  `;
+  
+  document.body.insertAdjacentHTML('beforeend', cardForm);
+}
+
+function processCardPayment(amount, price) {
+  // For demo purposes, simulate payment processing
+  const cardNumber = document.getElementById('cardNumber').value;
+  const cardExpiry = document.getElementById('cardExpiry').value;
+  const cardCvv = document.getElementById('cardCvv').value;
+  
+  if (!cardNumber || !cardExpiry || !cardCvv) {
+    alert('Please fill in all card details');
+    return;
+  }
+  
+  // Simulate payment processing
+  const processingDiv = document.createElement('div');
+  processingDiv.style.cssText = `
+    position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.8);z-index:1001;display:flex;justify-content:center;align-items:center
+  `;
+  processingDiv.innerHTML = `
+    <div style="background:rgba(0,0,0,0.9);padding:30px;border-radius:12px;text-align:center">
+      <h3 style="margin:0 0 15px 0">Processing Payment...</h3>
+      <div style="margin-bottom:15px">Please wait while we process your payment</div>
+      <div style="width:40px;height:40px;border:4px solid #333;border-top:4px solid var(--accent);border-radius:50%;animation:spin 1s linear infinite;margin:0 auto"></div>
+    </div>
+  `;
+  document.body.appendChild(processingDiv);
+  
+  // Simulate processing time
+  setTimeout(() => {
+    processingDiv.remove();
+    closeCardForm();
+    completePurchase(amount);
+  }, 2000);
+}
+
+function closeCardForm() {
+  const form = document.querySelector('div[style*="position:fixed"][style*="z-index:1000"]');
+  if (form) form.remove();
+}
+
+function completePurchase(amount) {
+  // Add gems to user's account
+  monetization.gems += amount;
+  localStorage.setItem('ca_gems', monetization.gems.toString());
+  document.getElementById('gemDisplay').textContent = monetization.gems;
+  
+  // Show success notification
+  showGemNotification(amount, `${amount} gems purchased successfully!`);
+  closePremiumShop();
+  
+  // Show success message
+  alert(`✅ Payment successful!\n\nYou received ${amount} gems!\n\nNote: This is a demo. In a real app, you would need to set up a payment processor like PayPal or Stripe.`);
+}
+
+function showGemNotification(amount, message = '') {
+  const notification = document.createElement('div');
+  notification.style.cssText = `
+    position: fixed; top: 20px; right: 20px; background: linear-gradient(45deg, #ffd700, #ffb300);
+    color: #000; padding: 12px 16px; border-radius: 8px; z-index: 1000;
+    font-weight: bold; box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+    transform: translateX(100%); transition: transform 0.3s ease;
+  `;
+  notification.textContent = `${amount > 0 ? '+' : ''}${amount} 💎 ${message}`;
+  document.body.appendChild(notification);
+  setTimeout(() => notification.style.transform = 'translateX(0)', 100);
+  setTimeout(() => {
+    notification.style.transform = 'translateX(100%)';
+    setTimeout(() => document.body.removeChild(notification), 300);
+  }, 3000);
+}
+
+function applyPremiumFeatures() {
+  // Apply premium features to gameplay
+  if (monetization.premiumFeatures.doubleCoins) {
+    // Double coin collection
+    coinCount *= 2;
+  }
+  
+  if (monetization.premiumFeatures.extraLives) {
+    // Start with extra lives
+    lives += 2;
+  }
+  
+  if (monetization.premiumFeatures.unlimitedSpecial) {
+    // Remove special attack cooldown
+    specialAttack.cooldown = 0;
+  }
+}
+
+/* expose for buttons */
+window.toggleStore = toggleStore;
+window.restart = restart;
+window.downloadScore = downloadScore;
+window.buy = buy;
+window.togglePause = togglePause;
+window.toggleSettings = toggleSettings;
+window.closeSettings = closeSettings;
+window.toggleUpgradeShop = toggleUpgradeShop;
+window.closeUpgradeShop = closeUpgradeShop;
+window.selectSkin = selectSkin;
+window.selectParticles = selectParticles;
+window.toggleDailyChallenges = toggleDailyChallenges;
+window.closeDailyChallenges = closeDailyChallenges;
+window.updateDailyChallengesDisplay = updateDailyChallengesDisplay;
+window.togglePremiumShop = togglePremiumShop;
+window.closePremiumShop = closePremiumShop;
+window.watchAdForGems = watchAdForGems;
+window.closeAd = closeAd;
+window.simulateAdComplete = simulateAdComplete;
+window.buyPremiumFeature = buyPremiumFeature;
+window.buyGemPack = buyGemPack;
+window.showMobileControls = showMobileControls;
+window.hideMobileControls = hideMobileControls;
+window.initializeMonetization = initializeMonetization;
+
+/* optional small auto-hide of joystick until touch */
+hideJoystick();
+
+/* Show mobile controls on mobile devices */
+function showMobileControls() {
+  const mobileControls = document.getElementById('mobileControls');
+  if (mobileControls) {
+    mobileControls.style.display = 'block';
+  }
+}
+
+function hideMobileControls() {
+  const mobileControls = document.getElementById('mobileControls');
+  if (mobileControls) {
+    mobileControls.style.display = 'none';
+  }
+}
+
+// Show mobile controls if on mobile device
+if (isMobile) {
+  showMobileControls();
+  document.getElementById('mobileHint').style.display = 'inline';
+  
+  // Show mobile welcome message
+  setTimeout(() => {
+    const mobileWelcome = document.createElement('div');
+    mobileWelcome.style.cssText = `
+      position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
+      background: rgba(0,0,0,0.9); color: #fff; padding: 20px; border-radius: 12px;
+      text-align: center; z-index: 1000; max-width: 300px; box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+    `;
+    mobileWelcome.innerHTML = `
+      <h3 style="margin:0 0 10px 0">📱 Mobile Controls</h3>
+      <p style="margin:0 0 15px 0;font-size:14px">
+        Use the buttons in the bottom-right corner to access:<br>
+        • Store, Settings, Upgrades<br>
+        • Challenges, Premium Shop<br>
+        • Special Attack
+      </p>
+      <button onclick="this.parentElement.remove()" style="background:var(--accent);border:none;padding:8px 16px;border-radius:6px;color:#000;cursor:pointer">Got it!</button>
+    `;
+    document.body.appendChild(mobileWelcome);
+    
+    // Auto-remove after 8 seconds
+    setTimeout(() => {
+      if (mobileWelcome.parentElement) {
+        mobileWelcome.remove();
+      }
+    }, 8000);
+  }, 1000);
+}
+
+// Also show mobile controls on window resize for responsive design
+window.addEventListener('resize', () => {
+  if (window.innerWidth <= 768) {
+    showMobileControls();
+  } else if (!isMobile) {
+    hideMobileControls();
+  }
+});
+
+/* Start background music */
+startMusic();
+
+/* Initialize daily challenges if none exist */
+if (dailyChallenges.current.length === 0) {
+  dailyChallenges.current = generateDailyChallenges();
+  localStorage.setItem('ca_daily_challenges', JSON.stringify(dailyChallenges.current));
+}
+
+/* Initialize monetization */
+initializeMonetization();
+
+</script>
+</body>
+</html>
