@@ -1907,24 +1907,29 @@ function initializePayPalButtons() {
     
     try {
       paypal.Buttons({
-        createOrder: (data, actions) => {
-          console.log('Creating PayPal order for', pack.amount, 'gems at $', pack.price);
-          return actions.order.create({
-            purchase_units: [{
-              amount: {
-                value: pack.price.toString()
-              },
-              description: `${pack.amount} Gems Pack`
-            }]
+        createOrder: async () => {
+          console.log('Creating PayPal order via backend for', pack.amount, 'gems at $', pack.price);
+          const res = await fetch('/api/paypal/create-order', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ amountUSD: pack.price.toString(), description: `${pack.amount} Gems Pack` })
           });
+          const data = await res.json();
+          if (!data?.id) throw new Error('Failed to create order');
+          return data.id;
         },
-        onApprove: (data, actions) => {
-          console.log('PayPal payment approved, capturing order...');
-          return actions.order.capture().then((details) => {
-            console.log('Payment completed:', details);
+        onApprove: async (data) => {
+          console.log('PayPal approved, capturing via backend...', data);
+          const res = await fetch(`/api/paypal/capture-order/${data.orderID}`, { method: 'POST' });
+          if (!res.ok) throw new Error('Capture failed');
+          const details = await res.json();
+          console.log('Capture result:', details);
+          if (details?.status === 'COMPLETED') {
             completePurchase(pack.amount);
             showGemNotification(pack.amount, `Payment successful! ${pack.amount} gems added.`);
-          });
+          } else {
+            alert('Payment not completed.');
+          }
         },
         onError: (err) => {
           console.error('PayPal payment error:', err);
